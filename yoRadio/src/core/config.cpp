@@ -233,11 +233,11 @@ void Config::listSD(File &plSDfile, File &plSDindex, const char * dirname, uint8
         listSD(plSDfile, plSDindex, fp, levels -1);
       }
     } else {
-      if(endsWith(strlwr((char*)fn), ".mp3") || endsWith(fn, ".m4a") || endsWith(fn, ".aac") || endsWith(fn, ".wav") || endsWith(fn, ".flac")){
+      if(endsWith(strlwr((char*)fn), ".mp3") || endsWith(fn, ".flac") ||endsWith(fn, ".ogg") || endsWith(fn, ".vorbis") || endsWith(fn, ".opus")){
       	sdog.takeMutex();
         pos = plSDfile.position();
         plSDfile.print(fn); plSDfile.print("\t"); plSDfile.print(fp); plSDfile.print("\t"); plSDfile.println(0);
-        plSDindex.write((byte *) &pos, 4);
+        plSDindex.write((uint8_t *) &pos, 4);
         sdog.giveMutex();
         Serial.print(".");
         if(display.mode()==SDCHANGE) display.putRequest(SDFILEINDEX, sdFCount+1);
@@ -395,7 +395,7 @@ void Config::loadTheme(){
 }
 
 template <class T> int Config::eepromWrite(int ee, const T& value) {
-  const byte* p = (const byte*)(const void*)&value;
+  const uint8_t* p = (const uint8_t*)(const void*)&value;
   int i;
   for (i = 0; i < sizeof(value); i++)
     EEPROM.write(ee++, *p++);
@@ -404,7 +404,7 @@ template <class T> int Config::eepromWrite(int ee, const T& value) {
 }
 
 template <class T> int Config::eepromRead(int ee, T& value) {
-  byte* p = (byte*)(void*)&value;
+  uint8_t* p = (uint8_t*)(void*)&value;
   int i;;
   for (i = 0; i < sizeof(value); i++)
     *p++ = EEPROM.read(ee++);
@@ -437,7 +437,7 @@ void Config::setDefaults() {
   store.dspon=true;
   store.brightness=100;
   store.contrast=55;
-  strlcpy(store.sntp1,"pool.ntp.org", 35);
+  strlcpy(store.sntp1,"2.ru.pool.ntp.org", 35);
   strlcpy(store.sntp2,"1.ru.pool.ntp.org", 35);
   store.showweather=false;
   strlcpy(store.weatherlat,"55.7512", 10);
@@ -503,7 +503,7 @@ void Config::saveVolume(){
   EEPROM.commit();
 }
 
-byte Config::setVolume(byte val) {
+uint8_t Config::setVolume(uint8_t val) {
   store.volume = val;
   display.putRequest(DRAWVOL);
   netserver.requestOnChange(VOLUME, 0);
@@ -517,7 +517,7 @@ void Config::setTone(int8_t bass, int8_t middle, int8_t trebble) {
   save();
 }
 
-void Config::setSmartStart(byte ss) {
+void Config::setSmartStart(uint8_t ss) {
   if (store.smartstart < 2) {
     store.smartstart = ss;
     save();
@@ -529,19 +529,19 @@ void Config::setBalance(int8_t balance) {
   save();
 }
 
-byte Config::setLastStation(uint16_t val) {
+uint16_t Config::setLastStation(uint16_t val) {
   store.lastStation = val;
   save();
   return store.lastStation;
 }
 
-byte Config::setCountStation(uint16_t val) {
+uint16_t Config::setCountStation(uint16_t val) {
   store.countStation = val;
   save();
   return store.countStation;
 }
 
-byte Config::setLastSSID(byte val) {
+uint8_t Config::setLastSSID(uint8_t val) {
   store.lastSSID = val;
   save();
   return store.lastSSID;
@@ -573,7 +573,7 @@ void Config::indexPlaylist() {
   while (playlist.available()) {
     uint32_t pos = playlist.position();
     if (parseCSV(playlist.readStringUntil('\n').c_str(), sName, sUrl, sOvol)) {
-      index.write((byte *) &pos, 4);
+      index.write((uint8_t *) &pos, 4);
     }
   }
   index.close();
@@ -773,7 +773,7 @@ bool Config::parseJSON(const char* line, char* name, char* url, int &ovol) {
   return true;
 }
 
-bool Config::parseWsCommand(const char* line, char* cmd, char* val, byte cSize) {
+bool Config::parseWsCommand(const char* line, char* cmd, char* val, uint8_t cSize) {
   char *tmpe;
   tmpe = strstr(line, "=");
   if (tmpe == NULL) return false;
@@ -824,7 +824,7 @@ bool Config::initNetwork() {
     return false;
   }
   char ssidval[30], passval[40];
-  byte c = 0;
+  uint8_t c = 0;
   while (file.available()) {
     if (parseSsid(file.readStringUntil('\n').c_str(), ssidval, passval)) {
       strlcpy(ssids[c].ssid, ssidval, 30);
@@ -908,7 +908,7 @@ void Config::sleepForAfter(uint16_t sf, uint16_t sa){
 
 void Config::bootInfo() {
   BOOTLOG("************************************************");
-  BOOTLOG("*               ёPadio v%s                *", YOVERSION);
+  BOOTLOG("*               ёRadio v%s(m)             *", YOVERSION);
   BOOTLOG("************************************************");
   BOOTLOG("------------------------------------------------");
   BOOTLOG("arduino:\t%d", ARDUINO);
@@ -919,11 +919,18 @@ void Config::bootInfo() {
 	  chipId |= ((ESP.getEfuseMac() >> (40 - i)) & 0xff) << i;
 	}
   BOOTLOG("chip:\t\tmodel: %s | rev: %d | id: %d | cores: %d | psram: %d", ESP.getChipModel(), ESP.getChipRevision(), chipId, ESP.getChipCores(), ESP.getPsramSize());
-  BOOTLOG("display:\t%d", DSP_MODEL);
+  BOOTLOG("display:\tmodel: %d (CS-%d, DC-%d, RST-%d, HSPI-%s)", DSP_MODEL, TFT_CS, TFT_DC, TFT_RST, DSP_HSPI?"true":"false");
+//  BOOTLOG("display:\tmodel: %d, %s (CS-%d, DC-%d, RST-%d, HSPI-%s, MOSI-%d, SCLK-%d)", DSP_MODEL, DSP_MODEL, TFT_CS, TFT_DC, TFT_RST, DSP_HSPI?"true":"false", mosi_pin, sck_pin);
   if(VS1053_CS==255) {
-    BOOTLOG("audio:\t\t%s (%d, %d, %d)", "I2S", I2S_DOUT, I2S_BCLK, I2S_LRC);
+    BOOTLOG("audio:\t\t%s (DOUT-%d, BCLK-%d, LRC-%d)", "I2S", I2S_DOUT, I2S_BCLK, I2S_LRC);
   }else{
-    BOOTLOG("audio:\t\t%s (%d, %d, %d, %d, %s)", "VS1053", VS1053_CS, VS1053_DCS, VS1053_DREQ, VS1053_RST, VS_HSPI?"true":"false");
+    #ifdef ARDUINO_ESP32S3_DEV
+        BOOTLOG("audio:\t\t%s (CS-%d, DCS-%d, DREQ-%d, RST-%d, FSPI-%s)", "VS1053", VS1053_CS, VS1053_DCS, VS1053_DREQ, VS1053_RST, VS_FSPI?"true":"false");
+//        BOOTLOG("audio:\t\t%s (CS-%d, DCS-%d, DREQ-%d, RST-%d, FSPI-%s, MOSI-%d, MISO-%d, SCK-%d)", "VS1053", VS1053_CS, VS1053_DCS, VS1053_DREQ, VS1053_RST, VS_FSPI?"true":"false", mosi_pin, miso_pin, sck_pin);
+    #else
+        BOOTLOG("audio:\t\t%s (CS-%d, DCS-%d, DREQ-%d, RST-%d, HSPI-%s)", "VS1053", VS1053_CS, VS1053_DCS, VS1053_DREQ, VS1053_RST, VS_HSPI?"true":"false");
+//        BOOTLOG("audio:\t\t%s (CS-%d, DCS-%d, DREQ-%d, RST-%d, HSPI-%s, MOSI-%d, MISO-%d, SCK-%d)", "VS1053", VS1053_CS, VS1053_DCS, VS1053_DREQ, VS1053_RST, VS_HSPI?"true":"false", mosi_pin, miso_pin, sck_pin);
+    #endif
   }
   BOOTLOG("audioinfo:\t%s", store.audioinfo?"true":"false");
   BOOTLOG("smartstart:\t%d", store.smartstart);
@@ -935,7 +942,7 @@ void Config::bootInfo() {
   BOOTLOG("buttons:\tleft=%d, center=%d, right=%d, up=%d, down=%d, mode=%d, pullup=%s", BTN_LEFT, BTN_CENTER, BTN_RIGHT, BTN_UP, BTN_DOWN, BTN_MODE, BTN_INTERNALPULLUP?"true":"false");
   BOOTLOG("encoders:\tl1=%d, b1=%d, r1=%d, pullup=%s, l2=%d, b2=%d, r2=%d, pullup=%s", ENC_BTNL, ENC_BTNB, ENC_BTNR, ENC_INTERNALPULLUP?"true":"false", ENC2_BTNL, ENC2_BTNB, ENC2_BTNR, ENC2_INTERNALPULLUP?"true":"false");
   BOOTLOG("ir:\t\t%d", IR_PIN);
-  if(SDC_CS!=255) BOOTLOG("SD:\t\t%d", SDC_CS);
+  if(SDC_CS!=255) BOOTLOG("SD:\t\tCS-%d", SDC_CS);
   BOOTLOG("------------------------------------------------");
 }
 

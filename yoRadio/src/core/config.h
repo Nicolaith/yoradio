@@ -13,7 +13,7 @@
 #define EEPROM_START_IR   0
 #define EEPROM_START_2    10
 #ifndef BUFLEN
-  #define BUFLEN            170
+  #define BUFLEN            250
 #endif
 #define PLAYLIST_PATH     "/data/playlist.csv"
 #define SSIDS_PATH        "/data/wifi.csv"
@@ -42,7 +42,7 @@
 #endif
 enum playMode_e      : uint8_t  { PM_WEB=0, PM_SDCARD=1 };
 enum cardStatus_e    : uint8_t  { CS_NONE=0, CS_PRESENT=1, CS_MOUNTED=2, CS_EJECTED=3 };
-enum BitrateFormat { BF_UNCNOWN, BF_MP3, BF_AAC, BF_FLAC, BF_OGG, BF_WAV };
+enum BitrateFormat { BF_UNCNOWN, BF_MP3, BF_AAC, BF_FLAC, BF_WAV, BF_OGG, /*BF_M4A,*/ BF_VOR, BF_OPU };
 
 void u8fix(char *src);
 
@@ -79,16 +79,16 @@ struct theme_t {
 struct config_t
 {
   unsigned int config_set; //must be 4262
-  byte volume;
+  uint8_t volume;
   int8_t balance;
   int8_t trebble;
   int8_t middle;
   int8_t bass;
   uint16_t lastStation;
   uint16_t countStation;
-  byte lastSSID;
+  uint8_t lastSSID;
   bool audioinfo;
-  byte smartstart;
+  uint8_t smartstart;
   int8_t tzHour;
   int8_t tzMin;
   uint16_t timezoneOffset;
@@ -161,7 +161,7 @@ class Config {
 #endif
     BitrateFormat configFmt = BF_UNCNOWN;
     neworkItem ssids[5];
-    byte ssidsCount;
+    uint8_t ssidsCount;
     uint16_t sleepfor;
     uint32_t sdResumePos;
     uint16_t backupLastStation;
@@ -177,24 +177,24 @@ class Config {
 #endif
     void init();
     void loadTheme();
-    byte setVolume(byte val);
+    uint8_t setVolume(uint8_t val);
     void saveVolume();
     void setTone(int8_t bass, int8_t middle, int8_t trebble);
     void setBalance(int8_t balance);
-    byte setLastStation(uint16_t val);
-    byte setCountStation(uint16_t val);
-    byte setLastSSID(byte val);
+    uint16_t setLastStation(uint16_t val);
+    uint16_t setCountStation(uint16_t val);
+    uint8_t setLastSSID(uint8_t val);
     void setTitle(const char* title);
     void setStation(const char* station);
     bool parseCSV(const char* line, char* name, char* url, int &ovol);
     bool parseJSON(const char* line, char* name, char* url, int &ovol);
-    bool parseWsCommand(const char* line, char* cmd, char* val, byte cSize);
+    bool parseWsCommand(const char* line, char* cmd, char* val, uint8_t cSize);
     bool parseSsid(const char* line, char* ssid, char* pass);
     void loadStation(uint16_t station);
     bool initNetwork();
     bool saveWifi();
     bool saveWifiFromNextion(const char* post);
-    void setSmartStart(byte ss);
+    void setSmartStart(uint8_t ss);
     void setBitrateFormat(BitrateFormat fmt) { configFmt = fmt; }
     void initPlaylist();
     void indexPlaylist();

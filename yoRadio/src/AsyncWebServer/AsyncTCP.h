@@ -21,6 +21,7 @@
 
 #ifndef ASYNCTCP_H_
 #define ASYNCTCP_H_
+
 #include "../core/options.h"
 #include "IPAddress.h"
 #include "sdkconfig.h"
@@ -32,29 +33,10 @@ extern "C" {
 
 //If core is not defined, then we are running in Arduino or PIO
 #ifndef CONFIG_ASYNC_TCP_RUNNING_CORE
-  #define CONFIG_ASYNC_TCP_RUNNING_CORE 1 //any available core (-1)
+#define CONFIG_ASYNC_TCP_RUNNING_CORE -1 //any available core
+#define CONFIG_ASYNC_TCP_USE_WDT 1 //if enabled, adds between 33us and 200us per event
 #endif
 
-#ifndef CONFIG_ASYNC_TCP_USE_WDT
-  #define CONFIG_ASYNC_TCP_USE_WDT 0 //if enabled, adds between 33us and 200us per event (1)
-#endif
-
-#ifndef XTASK_MEM_SIZE
-  #define XTASK_MEM_SIZE  6144 // 8192 / 2
-#endif
-#ifndef XTASK_PRIOTITY
-  #define XTASK_PRIOTITY  3 //3
-#endif
-#ifndef ATCP_TASK_DELAY
-  #define ATCP_TASK_DELAY  2
-#endif
-
-#ifndef XQUEUE_SIZE
-  #define XQUEUE_SIZE     128  // (32)
-#endif
-#ifndef SEND_ASYNC_EVENT_DELAY
-  #define SEND_ASYNC_EVENT_DELAY  portMAX_DELAY
-#endif
 class AsyncClient;
 
 #define ASYNC_MAX_ACK_TIME 5000

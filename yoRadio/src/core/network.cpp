@@ -11,7 +11,7 @@
 	#define WIFI_ATTEMPTS	16
 #endif
 
-Network network;
+NetWork network;
 
 TaskHandle_t syncTaskHandle;
 //TaskHandle_t reconnectTaskHandle;
@@ -73,7 +73,7 @@ void ticks() {
   }
 }
 
-void Network::WiFiReconnected(WiFiEvent_t event, WiFiEventInfo_t info){
+void NetWork::WiFiReconnected(WiFiEvent_t event, WiFiEventInfo_t info){
   network.beginReconnect = false;
   player.lockOutput = false;
   delay(100);
@@ -90,7 +90,7 @@ void Network::WiFiReconnected(WiFiEvent_t event, WiFiEventInfo_t info){
   #endif
 }
 
-void Network::WiFiLostConnection(WiFiEvent_t event, WiFiEventInfo_t info){
+void NetWork::WiFiLostConnection(WiFiEvent_t event, WiFiEventInfo_t info){
   if(!network.beginReconnect){
     Serial.printf("Lost connection, reconnecting to %s...\n", config.ssids[config.store.lastSSID-1].ssid);
     if(config.getMode()==PM_SDCARD) {
@@ -106,7 +106,7 @@ void Network::WiFiLostConnection(WiFiEvent_t event, WiFiEventInfo_t info){
   WiFi.reconnect();
 }
 
-bool Network::wifiBegin(bool silent){
+bool NetWork::wifiBegin(bool silent){
   uint8_t ls = (config.store.lastSSID == 0 || config.store.lastSSID > config.ssidsCount) ? 0 : config.store.lastSSID - 1;
   uint8_t startedls = ls;
   uint8_t errcnt = 0;
@@ -121,7 +121,9 @@ bool Network::wifiBegin(bool silent){
     while (WiFi.status() != WL_CONNECTED) {
       if(!silent) Serial.print(".");
       delay(500);
-      if(LED_BUILTIN!=255 && !silent) digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+      #ifdef ARDUINO_ESP32_DEV
+         if(LED_BUILTIN!=255 && !silent) digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+      #endif
       errcnt++;
       if (errcnt > WIFI_ATTEMPTS) {
         errcnt = 0;
@@ -158,7 +160,7 @@ void searchWiFi(void * pvParameters){
 
 #define DBGAP false
 
-void Network::begin() {
+void NetWork::begin() {
   BOOTLOG("network.begin");
   config.initNetwork();
   ctimer.detach();
@@ -193,7 +195,7 @@ void Network::begin() {
   if (network_on_connect) network_on_connect();
 }
 
-void Network::setWifiParams(){
+void NetWork::setWifiParams(){
   WiFi.setSleep(false);
   WiFi.onEvent(WiFiReconnected, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP);
   WiFi.onEvent(WiFiLostConnection, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
@@ -210,7 +212,7 @@ void Network::setWifiParams(){
   }
 }
 
-void Network::requestTimeSync(bool withTelnetOutput, uint8_t clientId) {
+void NetWork::requestTimeSync(bool withTelnetOutput, uint8_t clientId) {
   if (withTelnetOutput) {
     char timeStringBuff[50];
     strftime(timeStringBuff, sizeof(timeStringBuff), "%Y-%m-%dT%H:%M:%S", &timeinfo);
@@ -226,7 +228,7 @@ void rebootTime() {
   ESP.restart();
 }
 
-void Network::raiseSoftAP() {
+void NetWork::raiseSoftAP() {
   WiFi.mode(WIFI_AP);
   WiFi.softAP(apSsid, apPassword);
   Serial.println("##[BOOT]#");
@@ -240,7 +242,7 @@ void Network::raiseSoftAP() {
     rtimer.once(config.store.softapdelay*60, rebootTime);
 }
 
-void Network::requestWeatherSync(){
+void NetWork::requestWeatherSync(){
   display.putRequest(NEWWEATHER);
 }
 
@@ -318,94 +320,145 @@ bool getWeather(char *wstr) {
     Serial.println("##WEATHER###: weather not found !");
     return false;
   }
+
+//		  Serial.printf("## OPENWEATHERMAP ###: *\n%s,\n*\n", line.c_str());
+
   char *tmpe;
   char *tmps;
   char *tmpc;
+  int pressi, deg, gusti;
+  #ifndef GRND_HEIGHT
+    #define GRND_HEIGHT  0
+  #endif
+  int g_height = (float)(GRND_HEIGHT / 11);
   const char* cursor = line.c_str();
-  char desc[120], temp[20], hum[20], press[20], icon[5];
+  char desc[120], temp[20], hum[20], press[20], icon[5], gust[20], porv[10], stanc[50];
 
   tmps = strstr(cursor, "\"description\":\"");
   if (tmps == NULL) { Serial.println("##WEATHER###: description not found !"); return false;}
   tmps += 15;
   tmpe = strstr(tmps, "\",\"");
-  if (tmpe == NULL) { Serial.println("##WEATHER###: description not found !"); return false;}
+  if (tmpe == NULL) { Serial.println("##WEATHER###: description content not found !"); return false;}
   strlcpy(desc, tmps, tmpe - tmps + 1);
-  cursor = tmpe + 2;
-  
-  // "СЏСЃРЅРѕ","icon":"01d"}],
+  cursor = tmps;
+//    Serial.printf("#CONTROL#: descr.: %s,\n", desc);
+
+  // "sky clear","icon":"01d"}],
   tmps = strstr(cursor, "\"icon\":\"");
   if (tmps == NULL) { Serial.println("##WEATHER###: icon not found !"); return false;}
   tmps += 8;
   tmpe = strstr(tmps, "\"}");
-  if (tmpe == NULL) { Serial.println("##WEATHER###: icon not found !"); return false;}
+  if (tmpe == NULL) { Serial.println("##WEATHER###: icon content not found !"); return false;}
   strlcpy(icon, tmps, tmpe - tmps + 1);
-  cursor = tmpe + 2;
-  
+  cursor = tmps;
+
   tmps = strstr(cursor, "\"temp\":");
   if (tmps == NULL) { Serial.println("##WEATHER###: temp not found !"); return false;}
   tmps += 7;
   tmpe = strstr(tmps, ",\"");
-  if (tmpe == NULL) { Serial.println("##WEATHER###: temp not found !"); return false;}
+  if (tmpe == NULL) { Serial.println("##WEATHER###: temp content not found !"); return false;}
   strlcpy(temp, tmps, tmpe - tmps + 1);
-  cursor = tmpe + 1;
+  cursor = tmps;
   float tempf = atof(temp);
+//    Serial.printf("#CONTROL#: temp: %+.1fC\n", tempf);
 
   tmps = strstr(cursor, "\"feels_like\":");
   if (tmps == NULL) { Serial.println("##WEATHER###: feels_like not found !"); return false;}
   tmps += 13;
   tmpe = strstr(tmps, ",\"");
-  if (tmpe == NULL) { Serial.println("##WEATHER###: feels_like not found !"); return false;}
+  if (tmpe == NULL) { Serial.println("##WEATHER###: feels_like content not found !"); return false;}
   strlcpy(temp, tmps, tmpe - tmps + 1);
-  cursor = tmpe + 2;
-  float tempfl = atof(temp); (void)tempfl;
+  cursor = tmps;
+  float tempfl = atof(temp);
+//  (void)tempfl;						// ?
+//    Serial.printf("#CONTROL#: feels like: %+.0fC\n", tempfl);
 
   tmps = strstr(cursor, "\"pressure\":");
   if (tmps == NULL) { Serial.println("##WEATHER###: pressure not found !"); return false;}
   tmps += 11;
   tmpe = strstr(tmps, ",\"");
-  if (tmpe == NULL) { Serial.println("##WEATHER###: pressure not found !"); return false;}
+  if (tmpe == NULL) { Serial.println("##WEATHER###: pressure content not found !"); return false;}
   strlcpy(press, tmps, tmpe - tmps + 1);
-  cursor = tmpe + 2;
-  int pressi = (float)atoi(press) / 1.333;
-  
+  cursor = tmps;
+      pressi = (float)atoi(press) / 1.333 - g_height;		// перевод в мм.рт.ст., ввод в целое число pressi поправки (-21) на выс. местности
+//      Serial.printf("#CONTROL#: pres.: %d mmHg\n", pressi);
+
   tmps = strstr(cursor, "humidity\":");
   if (tmps == NULL) { Serial.println("##WEATHER###: humidity not found !"); return false;}
   tmps += 10;
   tmpe = strstr(tmps, ",\"");
-  tmpc = strstr(tmps, "}");
+  tmpc = strstr(tmps, "},");
   if (tmpe == NULL) { Serial.println("##WEATHER###: humidity not found !"); return false;}
-  strlcpy(hum, tmps, tmpe - tmps + (tmpc>tmpe?1:0));
-  
+  cursor = tmps;
+  strlcpy(hum, tmps, tmpe - tmps + (tmpc>tmpe?1:(tmpc - tmpe +1)));
+//      Serial.printf("#CONTROL#: humidity: %s %%\n", hum);
+
   tmps = strstr(cursor, "\"grnd_level\":");
   bool grnd_level_pr = (tmps != NULL);
   if(grnd_level_pr){
     tmps += 13;
-    tmpe = strstr(tmps, ",\"");
-    if (tmpe == NULL) { Serial.println("##WEATHER###: grnd_level not found !"); return false;}
-    strlcpy(press, tmps, tmpe - tmps + 1);
-    cursor = tmpe + 2;
-    pressi = (float)atoi(press) / 1.333;
-  }
-  
+    tmpe = strstr(tmps, "},");
+    tmpc = strstr(tmps, ",\"");						// или адрес до[},]
+    if (tmpe == NULL) { Serial.println("##WEATHER###: grnd_level not found ! Use pressure");}
+    strlcpy(press, tmps, tmpe - tmps + (tmpc>tmpe?1:(tmpc - tmpe +1)));	// вписали в press строку данных (press="991")
+    cursor = tmps;
+    pressi = (float)atoi(press) / 1.333;			// преобразовали в целое число, перевели в мм.рт.ст. (pressi=743)
+ 			 }
+//      Serial.printf("#CONTROL#: press. grnd_level: %d mmHg\n", pressi);
+
   tmps = strstr(cursor, "\"speed\":");
   if (tmps == NULL) { Serial.println("##WEATHER###: wind speed not found !"); return false;}
   tmps += 8;
   tmpe = strstr(tmps, ",\"");
-  if (tmpe == NULL) { Serial.println("##WEATHER###: wind speed not found !"); return false;}
+  if (tmpe == NULL) { Serial.println("##WEATHER###: wind speed content not found !"); return false;}
   strlcpy(temp, tmps, tmpe - tmps + 1);
-  cursor = tmpe + 1;
-  float wind_speed = atof(temp); (void)wind_speed;
+  cursor = tmps;
+  float wind_speed = atof(temp);
+//  (void)wind_speed;					// ?
+//    Serial.printf("#CONTROL#: wind: %.0f m/s\n", wind_speed);
   
   tmps = strstr(cursor, "\"deg\":");
   if (tmps == NULL) { Serial.println("##WEATHER###: wind deg not found !"); return false;}
   tmps += 6;
   tmpe = strstr(tmps, ",\"");
-  if (tmpe == NULL) { Serial.println("##WEATHER###: wind deg not found !"); return false;}
-  strlcpy(temp, tmps, tmpe - tmps + 1);
-  cursor = tmpe + 1;
-  int wind_deg = atof(temp)/22.5;
-  if(wind_deg<0) wind_deg = 16+wind_deg;
+  tmpc = strstr(tmps, "},");				// или адрес до[},]
+  if (tmpe == NULL) { Serial.println("## WEATHER ###: deg content not found !"); return false;}
+  strlcpy(temp, tmps, tmpe - tmps + (tmpc>tmpe?1:(tmpc - tmpe +1)));	// вписали в temp строку данных (temp="316")
+  cursor = tmps;
+      deg = atof(temp);
+  int wind_deg = atof(temp)/22.5;		// преобр. в целое число и перевели в полурумбы (wind_deg=14) 
+//  if(wind_deg<0) wind_deg = 16+wind_deg;			//отрицательным не бывает
+//    Serial.printf("#CONTROL#: wind deg: %d rumbs (*%d*)\n", wind_deg, deg);
   
+  		// Проверяем наличие ["gust":13.09}] и добавляем его целое текстовое в строку gust
+  tmps = strstr(cursor, "\"gust\":");			// поиск ["gust":] 7
+  strlcpy(gust, const_getWeather, sizeof(gust));	// вписали в gust ("")
+  if (tmps == NULL) { Serial.println("## WEATHER ###: gust not found !\n");}
+  else {
+	  tmps += 7;						// добавили 7
+	  tmpe = strstr(tmps, "},");				// до [},]
+	  if (tmpe == NULL) { Serial.println("## WEATHER ###: gust content not found !");}
+	  else {
+		  strlcpy(temp, tmps, tmpe - tmps + 1);	// вписали в temp текстовую строку (temp="13.09")
+		      gusti = (float)atoi(temp);		// преобразовали в целое число (gusti=13)
+		  if (gusti == 0) { Serial.println("## WEATHER ###: gust content is 0 !");}
+		  else {
+			  strlcpy(gust, prv, sizeof(gust));	// вписали в gust константу *prv (", ПОРЫВЫ ")
+			  itoa(gusti, porv, 10);				// преобразовали gusti в текстовую строку (porv="13")
+			  strlcat(gust, porv, sizeof(gust));		// добавили к gust текстовую строку porv (", ПОРЫВЫ 13")
+			  }
+		  cursor = tmps;
+		  }
+	 }
+//    Serial.printf("#CONTROL#: gusts: %s m/s\n", gust);
+
+  tmps = strstr(cursor, "\"name\":\"");
+  if (tmps == NULL) { Serial.println("##WEATHER###: name station not found !"); return false;}
+  tmps += 8;
+  tmpe = strstr(tmps, "\",\"");
+  if (tmpe == NULL) { Serial.println("##WEATHER###: name station not found !"); return false;}
+  strlcpy(stanc, tmps, tmpe - tmps + 1);		// вписали в stanc метеостанцию
+//    Serial.printf("#CONTROL#: station: %s\n", stanc);
   
   #ifdef USE_NEXTION
     nextion.putcmdf("press_txt.txt=\"%dmm\"", pressi);
@@ -428,12 +481,13 @@ bool getWeather(char *wstr) {
     nextion.weatherVisible(1);
   #endif
   
-  Serial.printf("##WEATHER###: description: %s, temp:%.1f C, pressure:%dmmHg, humidity:%s%%\n", desc, tempf, pressi, hum);
+  Serial.printf("##WEATHER###: descr.: %s, temp.: %+.1f*C (feels like %+.0f*C) \007 press.: %d mm \007 hum.: %s%% \007 wind %s %.0f%s m/s (st. %s)\n", desc, tempf, tempfl, pressi, hum, wind[wind_deg], wind_speed, gust, stanc);
+//  Serial.printf("##WEATHER###: description: %s, temp:%+.1f C, pressure:%dmmHg, humidity:%s%%\n", desc, tempf, pressi, hum);
   #ifdef WEATHER_FMT_SHORT
   sprintf(wstr, weatherFmt, tempf, pressi, hum);
   #else
     #if EXT_WEATHER
-      sprintf(wstr, weatherFmt, desc, tempf, tempfl, pressi, hum, wind_speed, wind[wind_deg]);
+      sprintf(wstr, weatherFmt, desc, tempf, tempfl, pressi, hum, wind[wind_deg], wind_speed, gust, stanc);
     #else
       sprintf(wstr, weatherFmt, desc, tempf, pressi, hum);
     #endif

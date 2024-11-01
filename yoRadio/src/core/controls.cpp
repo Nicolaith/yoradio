@@ -204,6 +204,7 @@ void encoder2Loop() {
 
 #if IR_PIN!=255
 void irBlink() {
+#ifdef ARDUINO_ESP32_DEV
   if(LED_BUILTIN==255) return;
   if (player.status() == STOPPED) {
     for (byte i = 0; i < 7; i++) {
@@ -211,6 +212,7 @@ void irBlink() {
       delay(100);
     }
   }
+#endif
 }
 
 void irNum(byte num) {

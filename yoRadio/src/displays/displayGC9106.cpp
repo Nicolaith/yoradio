@@ -22,6 +22,41 @@ DspCore::DspCore(): Adafruit_GC9106Ex(TFT_CS, TFT_DC, TFT_RST) {}
 
 #include "tools/utf8RusGFX.h"
 
+///////////////////////////////////////////////////////////////
+#ifndef HIDE_BAT
+
+  #include "driver/adc.h"			// Подключение необходимого драйвера
+  #include "esp_adc_cal.h"			// Подключение необходимой библиотеки
+
+  #ifndef DELTA_BAT
+    #define DELTA_BAT 0	// Величина коррекции напряжения батареи
+  #endif
+  #ifndef R1
+    #define R1 50		// Номинал резистора на плюс (+)
+  #endif
+  #ifndef R2
+    #define R2 100	// Номинал резистора на плюс (-)
+  #endif
+
+  float ADC_R1 = R1;		// Номинал резистора на плюс (+)
+  float ADC_R2 = R2;		// Номинал резистора на минус (-)
+  float DELTA = DELTA_BAT;	// Величина коррекции напряжения батареи
+
+  int g = 1;		// Счётчик для мигалок
+  bool Charging;		// Признак, что подключено зарядное устройство
+
+  int reads = 100;    		// Количество замеров в одном измерении
+  float Volt = 0;		       // Напряжение на батарее
+  float Volt1 = 0, Volt2 = 0, Volt3 = 0, Volt4 = 0;	 // Предыдущие замеры напряжения на батарее
+  static esp_adc_cal_characteristics_t adc1_chars;
+
+  int ChargeLevel;
+// ==================== Массив напряжений на батарее, соответствующий проценту оставшегося заряда: 
+  float vs[22] = {2.60, 3.10, 3.20, 3.26, 3.29, 3.33, 3.37, 3.41, 3.46, 3.51, 3.56, 3.61, 3.65, 3.69, 3.72, 3.75, 3.78, 3.82, 3.88, 3.95, 4.03, 4.25};
+
+  #endif
+/////////////////////////////////////////////////////////////////////////////////
+
 void DspCore::initDisplay() {
   begin(DEF_SPI_FREQ);
   cp437(true);
@@ -93,6 +128,117 @@ void DspCore::_clockSeconds(){
   setCursor(_timeleft+_dotsLeft, clockTop);
   print(":");                                     /* print dots */
   setFont();
+
+/////////////////////////////////////////////////////////////////////////////
+  #ifndef HIDE_BAT
+// ================================ Отрисовка мигалок ===================================
+  setTextSize(BatFS);		//    setTextSize(2)
+
+  if (Charging)		// Если идёт зарядка (подключено зарядное устр-во) - бегающие квадратики - цвет Светлосиний (Cyan)
+    {
+	setTextColor(color565(0, 255, 255), config.theme.background);				// Светлосиний (Cyan)
+	if (network.timeinfo.tm_sec % 1 == 0)
+	{
+		if (g == 1) {setCursor(BatX, BatY); print("\xA0\xA2\x9E\x9F");}     // 2 квад. в конце
+		if (g == 2) {setCursor(BatX, BatY); print("\xA0\x9E\x9E\xA3");}     // 2 квад. по краям
+		if (g == 3) {setCursor(BatX, BatY); print("\x9D\x9E\xA2\xA3");}     // 2 квад. в начале
+		if (g >= 4) {g = 0; setCursor(BatX, BatY); print("\x9D\xA2\xA2\x9F");}     // 2 квад. в середине
+                g++;
+	}
+    }
+
+// ============================= Отрисовка предупреждающей мигалки ==========================
+    if (Volt < 2.8 )                 //мигающие квадратики - Красный (Red)
+    {
+     if (network.timeinfo.tm_sec % 1 == 0)
+      {
+         if (g == 1) {setTextColor(color565(255, 0, 0), config.theme.background); setCursor(BatX, BatY); print("\xA0\xA2\xA2\xA3");}          // полная - 6 кв.
+         if (g >= 2) {g = 0; setTextColor(color565(255, 0, 0), config.theme.background); setCursor(BatX, BatY); print("\x9D\x9E\x9E\x9F");}           // пустая - 0 кв.
+         g++;
+      }
+     }
+
+// ========================== Расчёт и отрисовка напряжений и заряда ==========================
+   if (network.timeinfo.tm_sec % 6 == 0)
+  {
+
+          //  Читаем АЦП "reads"= раз и складываем результат в милливольтах
+  float tempmVolt = 0;
+  for(int i = 0; i < reads; i++){
+
+         //  Настройка и инициализация АЦП
+//     adc1_config_width(ADC_WIDTH_12Bit); 
+//     adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_11db);
+     adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_DB_12);
+     adc1_ulp_enable();
+
+          //  Расчет характеристик АЦП т.е. коэффициенты усиления и смещения
+//     esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 0, &adc1_chars);
+     esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_12, ADC_WIDTH_BIT_12, 0, &adc1_chars);
+
+     tempmVolt += esp_adc_cal_raw_to_voltage(adc1_get_raw(ADC1_CHANNEL_0), &adc1_chars);
+                                        }
+
+  float mVolt = (tempmVolt / reads) / 1000;		       //  Получаем средний результат в Вольтах
+
+          //  Коррекция результата и получение напряжения батареи в Вольтах
+  Volt = (mVolt + 0.0028 * mVolt * mVolt + 0.0096 * mVolt - 0.051) / (ADC_R2 / (ADC_R1 + ADC_R2)) + DELTA;
+
+  if ((Volt > Volt1) && (Volt1 > Volt2) && (Volt2 > Volt3) && (Volt3 > Volt4)) {
+     Charging = true;						// установка признака, что подключено зарядное устройство
+     setTextColor(color565(0, 255, 255), config.theme.background);			// Светло-синий (Cyan)
+  									}
+  else {Charging = false;}					// установка признака, что зарядное устройство не подключено
+  Volt4 = Volt3;
+  Volt3 = Volt2;
+  Volt2 = Volt1;
+  Volt1 = Volt;
+
+// ============ Рассчитываем остаток заряда в процентах ====================================
+// Поиск индекса, соответствующего вольтажу. Индекс соответствует проценту оставшегося заряда
+
+  int idx = 0;
+  while (true) {
+//================= Получение % оставшегося заряда ============================
+    if (Volt < vs[idx+1]) {mVolt = Volt - vs[idx]; ChargeLevel = idx * 5 + round(mVolt /((vs[idx+1] - vs[idx]) / 5 )); break;}
+    else {idx++;}
+                 }
+    if (ChargeLevel < 0) ChargeLevel = 0; if (ChargeLevel > 100) ChargeLevel = 100;
+// ===================== Отрисовка статической батарейки =================================
+  setTextSize(BatFS);		// setTextSize(2)
+  if (!Charging)		// Если не идёт зарядка
+  {
+  setCursor(BatX, BatY);
+
+  if (				Volt >= 3.82) {setTextColor(color565(0, 255, 0), config.theme.background); print("\xA0\xA2\xA2\xA3");}    //больше 85% (6 квад.) - зел.
+  if ((Volt < 3.82) && (Volt >= 3.72)) {setTextColor(color565(0, 255, 0), config.theme.background); print("\x9D\xA2\xA2\xA3");}    //от70 до 85% (5 квад.) - зел.
+  if ((Volt < 3.72) && (Volt >= 3.61)) {setTextColor(color565(0, 255, 0), config.theme.background); print("\x9D\xA1\xA2\xA3");}    //от 55 до 70% (4 квад.) - зел.
+  if ((Volt < 3.61) && (Volt >= 3.46)) {setTextColor(color565(0, 255, 0), config.theme.background); print("\x9D\x9E\xA2\xA3");}    //от 40 до 55% (3 квад.) - зел.
+  if ((Volt < 3.46) && (Volt >= 3.33)) {setTextColor(color565(0, 255, 0), config.theme.background); print("\x9D\x9E\xA1\xA3");}    //от 25 до 40% (2 квад.) - зел.
+  if ((Volt < 3.33) && (Volt >= 3.20)) {setTextColor(color565(255, 255, 0), config.theme.background); print("\x9D\x9E\x9E\xA3");} //от 10 до 25% (1 квад.) - жёлт.
+  if ((Volt < 3.20) && (Volt >= 2.8)) {setTextColor(color565(255, 0, 0), config.theme.background); print("\x9D\x9E\x9E\x9F");}      //от 0 до 10% (0 квад.) - крас.
+   }
+
+  if (Volt < 2.8) {setTextColor(color565(255, 0, 0), config.theme.background);	}	// (0%) установка цвет Красный (Red)
+
+// =============== Вывод цифровых значений напряжения  на дисплей ============================
+  #ifndef HIDE_VOLT				// ========== Начало вывода напряжения
+  setTextSize(VoltFS); 			// setTextSize(2)
+  setCursor(VoltX, VoltY); 		// Установка координат для вывода напряжения
+  printf("%.3fv", Volt);			// Вывод напряжения (текущим цветом)
+  #endif 				// =========== Конец вывода напряжения
+
+// =================== Вывод цифровых значений заряда на дисплей ============================
+  setTextSize(ProcFS); 			// setTextSize(2)
+  setCursor(ProcX, ProcY); 		// Установка координат для вывода
+  printf("%3i%%", ChargeLevel); 	// Вывод процентов заряда батареи (текущим цветом) - формат вправо
+//  printf("%i%% ", ChargeLevel); 	// Вывод процентов заряда батареи (текущим цветом) с пробелом в конце - формат влево
+
+//Serial.printf("#BATT#: ADC: %i reads, V-batt: %.3f v, Capacity: %i\n", reads, Volt, ChargeLevel);	// Вывод значений в COM-порт для контроля
+  }
+
+  #endif			//   #ifndef HIDE_BAT
+/////////////////////////////////////////////////////////////////////////////////
 }
 
 void DspCore::_clockDate(){ }

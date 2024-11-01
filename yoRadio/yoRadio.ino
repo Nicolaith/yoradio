@@ -64,6 +64,7 @@ void setup() {
 
 void loop() {
   telnet.loop();
+//  if (network.status == CONNECTED || network.status==SDREADY) {
   if (network.status == CONNECTED || network.status==SDREADY) {
     player.loop();
     //loopControls();

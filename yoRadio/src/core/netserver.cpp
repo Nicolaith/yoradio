@@ -360,61 +360,61 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
       if (strcmp(cmd, "getactive") == 0   ) { requestOnChange(GETACTIVE, clientId);   return; }
       if (strcmp(cmd, "newmode") == 0     ) { newConfigMode = atoi(val); requestOnChange(CHANGEMODE, 0); return; }
       if (strcmp(cmd, "smartstart") == 0) {
-        byte valb = atoi(val);
+        uint8_t valb = atoi(val);
         config.store.smartstart = valb == 1 ? 1 : 2;
         if (!player.isRunning() && config.store.smartstart == 1) config.store.smartstart = 0;
         config.save();
         return;
       }
       if (strcmp(cmd, "audioinfo") == 0) {
-        byte valb = atoi(val);
+        uint8_t valb = atoi(val);
         config.store.audioinfo = valb;
         config.save();
         display.putRequest(AUDIOINFO);
         return;
       }
       if (strcmp(cmd, "vumeter") == 0) {
-        byte valb = atoi(val);
+        uint8_t valb = atoi(val);
         config.store.vumeter = valb;
         config.save();
         display.putRequest(SHOWVUMETER);
         return;
       }
       if (strcmp(cmd, "softap") == 0) {
-        byte valb = atoi(val);
+        uint8_t valb = atoi(val);
         config.store.softapdelay = valb;
         config.save();
         return;
       }
       if (strcmp(cmd, "invertdisplay") == 0) {
-        byte valb = atoi(val);
+        uint8_t valb = atoi(val);
         config.store.invertdisplay = valb;
         config.save();
         display.invert();
         return;
       }
       if (strcmp(cmd, "numplaylist") == 0) {
-        byte valb = atoi(val);
+        uint8_t valb = atoi(val);
         config.store.numplaylist = valb;
         config.save();
         display.putRequest(NEWMODE, CLEAR); display.putRequest(NEWMODE, PLAYER);
         return;
       }
       if (strcmp(cmd, "fliptouch") == 0) {
-        byte valb = atoi(val);
+        uint8_t valb = atoi(val);
         config.store.fliptouch = valb == 1;
         config.save();
         flipTS();
         return;
       }
       if (strcmp(cmd, "dbgtouch") == 0) {
-        byte valb = atoi(val);
+        uint8_t valb = atoi(val);
         config.store.dbgtouch = valb == 1;
         config.save();
         return;
       }
       if (strcmp(cmd, "flipscreen") == 0) {
-        byte valb = atoi(val);
+        uint8_t valb = atoi(val);
         config.store.flipscreen = valb;
         config.save();
         display.flip();
@@ -422,19 +422,19 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
         return;
       }
       if (strcmp(cmd, "brightness") == 0) {
-        byte valb = atoi(val);
+        uint8_t valb = atoi(val);
         if (!config.store.dspon) requestOnChange(DSPON, 0);
         config.store.brightness = valb;
         config.setBrightness(true);
         return;
       }
       if (strcmp(cmd, "screenon") == 0) {
-        byte valb = atoi(val);
+        uint8_t valb = atoi(val);
         config.setDspOn(valb == 1);
         return;
       }
       if (strcmp(cmd, "contrast") == 0) {
-        byte valb = atoi(val);
+        uint8_t valb = atoi(val);
         config.store.contrast = valb;
         config.save();
         display.setContrast();
@@ -574,7 +574,7 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
         }
       } /*  EOF RESETS  */
       if (strcmp(cmd, "volume") == 0) {
-        byte v = atoi(val);
+        uint8_t v = atoi(val);
         player.setVol(v);
       }
       if (strcmp(cmd, "sdpos") == 0) {
@@ -649,7 +649,7 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
         config.irchck = atoi(val);
       }
       if (strcmp(cmd, "irclr") == 0) {
-        byte cl = atoi(val);
+        uint8_t cl = atoi(val);
         config.ircodes.irVals[config.irindex][cl] = 0;
       }
 #endif

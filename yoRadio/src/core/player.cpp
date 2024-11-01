@@ -12,11 +12,21 @@ Player player;
 QueueHandle_t playerQueue;
 
 #if VS1053_CS!=255 && !I2S_INTERNAL
-  #if VS_HSPI
-    Player::Player(): Audio(VS1053_CS, VS1053_DCS, VS1053_DREQ, HSPI, 13, 12, 14) {}
+
+#ifdef ARDUINO_ESP32S3_DEV
+  #if VS_FSPI
+//    Player::Player(): Audio(VS1053_CS, VS1053_DCS, VS1053_DREQ, &SPI2, VS1053_MOSI, VS1053_MISO, VS1053_SCK) {}
+    Player::Player(): Audio(VS1053_CS, VS1053_DCS, VS1053_DREQ, &SPI2, 35, 37, 36) {}	// F2 - SPI2 - SubSPI
   #else
-    Player::Player(): Audio(VS1053_CS, VS1053_DCS, VS1053_DREQ) {}
+    Player::Player(): Audio(VS1053_CS, VS1053_DCS, VS1053_DREQ, FSPI, 11, 13, 12) {}	// F4 - SPI3 - FSPI
   #endif
+#else
+  #if VS_HSPI
+    Player::Player(): Audio(VS1053_CS, VS1053_DCS, VS1053_DREQ, HSPI, 13, 12, 14) {}	// HSPI, MOSI-13, MISO-12, SCK-14
+  #else
+    Player::Player(): Audio(VS1053_CS, VS1053_DCS, VS1053_DREQ) {}					// VSPI, MOSI-23, MISO-19, SCK-18
+  #endif
+#endif
   void ResetChip(){
     pinMode(VS1053_RST, OUTPUT);
     digitalWrite(VS1053_RST, LOW);
@@ -158,7 +168,7 @@ void Player::loop() {
   xSemaphoreGive(playmutex);
   if(!isRunning() && _status==PLAYING) _stop(true);
   if(_volTimer){
-    if((millis()-_volTicks)>3000){
+    if((millis()-_volTicks)>1500){
       config.saveVolume();
       _volTimer=false;
     }
@@ -171,7 +181,9 @@ void Player::loop() {
 }
 
 void Player::setOutputPins(bool isPlaying) {
+#ifdef ARDUINO_ESP32_DEV
   if(LED_BUILTIN!=255) digitalWrite(LED_BUILTIN, LED_INVERT?!isPlaying:isPlaying);
+#endif
   bool _ml = MUTE_LOCK?!MUTE_VAL:(isPlaying?!MUTE_VAL:MUTE_VAL);
   if(MUTE_PIN!=255) digitalWrite(MUTE_PIN, _ml);
 }
@@ -185,8 +197,8 @@ void Player::_play(uint16_t stationId) {
   	display.putRequest(PSTOP);
   }
   setOutputPins(false);
-  //config.setTitle(config.getMode()==PM_WEB?const_PlConnect:"");
-  config.setTitle(config.getMode()==PM_WEB?const_PlConnect:"[next track]");
+  config.setTitle(config.getMode()==PM_WEB?const_PlConnect:"");
+//  config.setTitle(config.getMode()==PM_WEB?const_PlConnect:"[next track]");
   config.station.bitrate=0;
   config.setBitrateFormat(BF_UNCNOWN);
   config.loadStation(stationId);
@@ -211,12 +223,12 @@ void Player::_play(uint16_t stationId) {
     if(config.getMode()==PM_SDCARD) {
       config.sdResumePos = 0;
       config.backupSDStation = stationId;
+    config.setTitle("");
     }
-    //config.setTitle("");
     config.setSmartStart(1);
     netserver.requestOnChange(MODE, 0);
-    setOutputPins(true);
     display.putRequest(PSTART);
+    setOutputPins(true);
     if (player_on_start_play) player_on_start_play();
   }else{
     telnet.printf("##ERROR#:\tError connecting to %s\n", config.station.url);
@@ -231,16 +243,16 @@ void Player::browseUrl(){
   remoteStationName = true;
   config.setDspOn(1);
   resumeAfterUrl = _status==PLAYING;
+  setOutputPins(false);
   display.putRequest(PSTOP);
 //  setDefaults();
-  setOutputPins(false);
   config.setTitle(const_PlConnect);
   if (connecttohost(burl)){
     _status = PLAYING;
     config.setTitle("");
     netserver.requestOnChange(MODE, 0);
-    setOutputPins(true);
     display.putRequest(PSTART);
+    setOutputPins(true);
     if (player_on_start_play) player_on_start_play();
   }else{
     telnet.printf("##ERROR#:\tError connecting to %s\n", burl);

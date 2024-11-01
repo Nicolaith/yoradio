@@ -50,6 +50,7 @@ The connection tables are located here https://github.com/e2002/yoradio#connecti
 #define DSP_ILI9486     22    // (Testing mode) 480x320  3.5'  https://aliexpress.com/item/1005001999296476.html?sku_id=12000018365356568
 #define DSP_SSD1322     23    // 256x64   2.8'  https://aliexpress.com/item/1005003480981568.html
 #define DSP_ST7920      24    // 128x64   2.6'  https://aliexpress.com/item/32699482638.html
+#define DSP_ST7789_170  25    // 320x170  1.9'  https://aliexpress.ru/item/1005006158153608.html
 #define DSP_CUSTOM      101   // your display
 
 #ifndef DSP_MODEL
@@ -107,6 +108,9 @@ The connection tables are located here https://github.com/e2002/yoradio#connecti
 #endif
 #ifndef VS_HSPI
   #define VS_HSPI   false      // use HSPI for VS1053 (miso=12, mosi=13, clk=14) instead of VSPI (by default)
+#endif
+#ifndef VS_FSPI
+  #define VS_FSPI   false      // ESP32-S3: use SubSPI for VS1053 (miso=13, mosi=11, clk=12) instead of VSPI (by default)
 #endif
 
 /*        I2S DAC                 */
@@ -258,8 +262,10 @@ The connection tables are located here https://github.com/e2002/yoradio#connecti
 #endif
 
 /*        ESP DEVBOARD            */
-#ifndef LED_BUILTIN
-  #define LED_BUILTIN   255
+#ifdef ARDUINO_ESP32_DEV
+  #ifndef LED_BUILTIN
+    #define LED_BUILTIN   255
+  #endif
 #endif
 
 /*        Other settings. You can overwrite them in the myoptions.h file        */

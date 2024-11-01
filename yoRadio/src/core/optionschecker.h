@@ -14,7 +14,9 @@
 #endif
 
 #ifndef ARDUINO_ESP32_DEV
-#  error ONLY MODULES "ESP32 Dev Module" AND "ESP32 Wrover Module" ARE SUPPORTED. PLEASE SELECT ONE OF THEM IN THE MENU >> TOOLS >> BOARD
+  #ifndef ARDUINO_ESP32S3_DEV
+  #  error ONLY MODULES "ESP32 Dev Module" , "ESP32 Wrover Module" AND "ESP32S3 Dev Module"  ARE SUPPORTED. PLEASE SELECT ONE OF THEM IN THE MENU >> TOOLS >> BOARD
+  #endif
 #endif
 
 #endif

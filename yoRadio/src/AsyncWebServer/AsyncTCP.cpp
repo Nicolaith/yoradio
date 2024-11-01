@@ -95,7 +95,7 @@ static uint32_t _closed_index = []() {
 
 static inline bool _init_async_event_queue(){
     if(!_async_queue){
-        _async_queue = xQueueCreate(XQUEUE_SIZE, sizeof(lwip_event_packet_t *));
+        _async_queue = xQueueCreate(32, sizeof(lwip_event_packet_t *));
         if(!_async_queue){
             return false;
         }
@@ -104,7 +104,7 @@ static inline bool _init_async_event_queue(){
 }
 
 static inline bool _send_async_event(lwip_event_packet_t ** e){
-    return _async_queue && xQueueSend(_async_queue, e, SEND_ASYNC_EVENT_DELAY) == pdPASS;
+    return _async_queue && xQueueSend(_async_queue, e, portMAX_DELAY) == pdPASS;
 }
 
 static inline bool _prepend_async_event(lwip_event_packet_t ** e){
@@ -201,9 +201,6 @@ static void _async_service_task(void *pvParameters){
             }
 #endif
         }
-#if ATCP_TASK_DELAY>0
-        vTaskDelay(ATCP_TASK_DELAY);
-#endif
     }
     vTaskDelete(NULL);
     _async_service_task_handle = NULL;
@@ -221,7 +218,7 @@ static bool _start_async_task(){
         return false;
     }
     if(!_async_service_task_handle){
-        xTaskCreateUniversal(_async_service_task, "async_tcp", XTASK_MEM_SIZE, NULL, XTASK_PRIOTITY, &_async_service_task_handle, CONFIG_ASYNC_TCP_RUNNING_CORE);
+        xTaskCreateUniversal(_async_service_task, "async_tcp", 8192 * 2, NULL, 3, &_async_service_task_handle, CONFIG_ASYNC_TCP_RUNNING_CORE);
         if(!_async_service_task_handle){
             return false;
         }

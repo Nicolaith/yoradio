@@ -20,11 +20,11 @@
 */
 #include "WebAuthentication.h"
 #include <libb64/cencode.h>
-#ifdef ESP32
+//#ifdef ESP32
 #include "mbedtls/md5.h"
-#else
-#include "md5.h"
-#endif
+//#else
+//#include "md5.h"
+//#endif
 
 
 // Basic Auth hash = base64("username:password")
@@ -69,16 +69,16 @@ static bool getMD5(uint8_t * data, uint16_t len, char * output){//33 bytes or mo
   if(_buf == NULL)
     return false;
   memset(_buf, 0x00, 16);
-#ifdef ESP32
+//#ifdef ESP32
   mbedtls_md5_init(&_ctx);
   mbedtls_md5_starts_ret(&_ctx);
   mbedtls_md5_update_ret(&_ctx, data, len);
   mbedtls_md5_finish_ret(&_ctx, _buf);
-#else
-  MD5Init(&_ctx);
-  MD5Update(&_ctx, data, len);
-  MD5Final(_buf, &_ctx);
-#endif
+//#else
+//  MD5Init(&_ctx);
+//  MD5Update(&_ctx, data, len);
+//  MD5Final(_buf, &_ctx);
+//#endif
   for(i = 0; i < 16; i++) {
     sprintf(output + (i * 2), "%02x", _buf[i]);
   }
