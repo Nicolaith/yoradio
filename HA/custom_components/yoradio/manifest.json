@@ -3,7 +3,7 @@
     "name": "ёRadio",
     "documentation": "https://github.com/e2002/yoradio",
     "dependencies": ["http", "mqtt"],
-    "codeowners": ["@e2002"],
+    "codeowners": ["@e2002","@nicolaith"],
     "requirements": [],
-    "version": "0.5.010"
+    "version": "0.7.020"
   }
