@@ -221,7 +221,7 @@ class YoRadioDevice(MediaPlayerEntity):
         return self._entity_picture
 
     async def async_update(self):
-        self._entity_picture = "https://github.com/home-assistant/brands/blob/master/custom_integrations/yoradio/icon.png"
+        self._entity_picture = "https://brands.home-assistant.io/yoradio/icon.png"
 
     async def async_set_volume_level(self, volume):
         await self.api.set_volume(round(volume * self._max_volume, 1))
